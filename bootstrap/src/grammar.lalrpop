@@ -1,0 +1,16 @@
+//! The parser for Hail.
+
+use crate::ast::*;
+
+grammar(file: u32);
+
+// Parser for the two possible boolean values.
+pub Bool: bool = {
+    "true" => true,
+    "false" => false,
+};
+
+pub Iden: &'input str = r"[a-zA-Z_][a-zA-Z_0-9]*";
+
+// String literals.  Escape codes aren't parsed yet.
+pub Str: &'input str = r#""([^\\"]|\\.)""#;

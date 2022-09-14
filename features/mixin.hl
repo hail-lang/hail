@@ -1,0 +1,106 @@
+// Mixins allow some sort of generic typing in Hail.  They function as a sort of macro that makes creating data structures for multiple different types easier.
+//
+// This is a simple dynamic array example.
+
+import { alloc, realloc, dealloc } from allocator;
+import { println } from fmt;
+
+// Mixins are like normal structs, enums, traits and unions.  The mixin keyword must come before `struct`/`enum`/`union`/`trait`, and must come after any `publ`
+// modifiers.
+//
+// `Mem` represents any type that is representable in memory.  This adds methods like `size_of`.
+publ mixin struct DynArray!<T: Mem> {
+    // The memory that the dynamic array uses.
+    buf: &mut T,
+
+    // The amount of items currently stored in the dynamic array.
+    len: uint,
+
+    // The amount of items the dynamic array can store without reallocating.
+    cap: uint,
+}
+
+impl!<T: Mem> DynArray!<T: Mem> {
+    // Creates an empty dynamic array.
+    publ fun new() -> Self {
+        #allow(unsafe_code) return Self::{
+            buf: alloc(T::size_of()), // allocate enough room for one of T
+            len: 0,
+            cap: 1,
+        };
+    }
+
+    // Doubles the amount of memory allocated for this dynamic array.
+    fun grow(&mut self) {
+        self.cap *= 2;
+        #allow(unsafe_code) self.buf = realloc(self.buf, self.cap * T::size_of());
+    }
+
+    // Pushes an item onto the end of the dynamic array.
+    publ fun push(&mut self, item: T) {
+        if self.len == self.cap {
+            self.grow();
+        }
+
+        self.buf[self.len] = item;
+        self.len += 1;
+    }
+
+    // Pops an item from the dynamic array.
+    publ fun pop(&mut self) -> T {
+        // pretend option types exist instead of panicking.
+        if self.len == 0 {
+            panic("attempted to pop a value off of an empty dynamic array.");
+        }
+
+        val item = *self.buf[self.len - 1];
+        self.len -= 1;
+    }
+
+    // Returns an item in the dynamic array.
+    publ fun get(&self, idx: uint) -> &T {
+        if idx >= self.len {
+            panic("get call is out of bounds.");
+        }
+
+        return self.buf[idx] as &T;
+    }
+
+    // Returns an item in the dynamic array.
+    publ fun get_mut(&mut self, idx: uint) -> &mut T {
+        if idx >= self.len {
+            panic("get_mut call is out of bounds.");
+        }
+
+        return self.buf[idx];
+    }
+}
+
+impl!<T: Drop + Mem> Drop for DynArray!<T> {
+    fun drop(self) {
+        val mut i = 0;
+        
+        while i < self.len {
+            (*self.buf[i]).drop();
+            i += 1;
+        }
+
+        #allow(unsafe_code) dealloc(self.buf);
+    }
+}
+
+impl!<T: !Drop + Mem> Drop for DynArray!<T> {
+    fun drop(self) {
+        #allow(unsafe_code) dealloc(self.buf);
+    }
+}
+
+// A dynamic array of `uint32`s.
+publ struct DynUint32Array = DynArray!<uint32>;
+
+publ fun main() {
+    val mut array = DynUint32Array::new();
+    array.push(42);
+    println(array.get(0).as_str());
+    array.drop();
+}

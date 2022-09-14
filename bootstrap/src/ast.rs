@@ -1,0 +1,1 @@
+//! ASTs for the Hail bootstrap compiler.
